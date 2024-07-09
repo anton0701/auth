@@ -22,16 +22,20 @@ message CreateRequest {
   string password_confirm = 4;
   UserRole role = 5;
 }
+
 enum UserRole {
   user = 0;
   admin = 1;
 }
+
 message CreateResponse {
   int64 id = 1;
 }
+
 message GetRequest {
   int64 id = 1;
 }
+
 message GetResponse {
   int64 id = 1;
   string name = 2;
@@ -40,12 +44,14 @@ message GetResponse {
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
 }
+
 message UpdateRequest {
   int64 id = 1;
   google.protobuf.StringValue name = 2;
   google.protobuf.StringValue email = 3;
   UserRole role = 4;
 }
+
 message DeleteRequest {
   int64 id = 1;
 }
