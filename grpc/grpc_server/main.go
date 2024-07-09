@@ -20,7 +20,9 @@ type server struct {
 }
 
 func (s *server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetResponse, error) {
-	fmt.Printf("Method Get. Input params:\nId: %d\n************\n\n", req.Id)
+	log.Printf("Method Get. Input params:\nId: %d\n************\n\n",
+		req.GetId())
+
 	response := &desc.GetResponse{
 		Id:        req.GetId(),
 		Name:      "Test Name",
@@ -29,26 +31,43 @@ func (s *server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetRespon
 		CreatedAt: timestamppb.New(time.Now()),
 		UpdatedAt: timestamppb.New(time.Now()),
 	}
+
 	return response, nil
 }
 
 func (s *server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
-	fmt.Printf("Method Create. Input params:\nName: %s\nEmail: %s\nPassword: %s\nPasswordConfirm: %s\nRole: %s\n************\n\n", req.Name, req.Email, req.Password, req.PasswordConfirm, req.Role)
+	log.Printf("Method Create. Input params:\nName: %s\nEmail: %s\nPassword: %s\nPasswordConfirm: %s\nRole: %s\n************\n\n",
+		req.GetName(),
+		req.GetEmail(),
+		req.GetPassword(),
+		req.GetPasswordConfirm(),
+		req.GetRole())
+
 	resp := &desc.CreateResponse{
 		Id: 1,
 	}
+
 	return resp, nil
 }
 
 func (s *server) Update(ctx context.Context, req *desc.UpdateRequest) (*emptypb.Empty, error) {
-	fmt.Printf("Method Update. Input params:\nId: %d\nName: %s\nEmail: %s\nRole: %s\n************\n\n", req.Id, req.Name, req.Email, req.Role)
+	log.Printf("Method Update. Input params:\nId: %d\nName: %s\nEmail: %s\nRole: %s\n************\n\n",
+		req.GetId(),
+		req.GetName(),
+		req.GetEmail(),
+		req.GetRole())
+
 	resp := &emptypb.Empty{}
+
 	return resp, nil
 }
 
 func (s *server) Delete(ctx context.Context, req *desc.DeleteRequest) (*emptypb.Empty, error) {
-	fmt.Printf("Method Delete. Input params:\nId: %d\n************\n\n", req.Id)
+	log.Printf("Method Delete. Input params:\nId: %d\n************\n\n",
+		req.GetId())
+
 	resp := &emptypb.Empty{}
+
 	return resp, nil
 }
 
@@ -63,7 +82,7 @@ func main() {
 	reflection.Register(s)
 	desc.RegisterUserV1Server(s, &server{})
 
-	log.Printf("server listening at %v", lis.Addr())
+	log.Printf("server listening at %v\n\n", lis.Addr())
 
 	if err = s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
