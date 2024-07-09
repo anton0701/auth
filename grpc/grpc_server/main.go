@@ -14,12 +14,14 @@ import (
 )
 
 const grpcPort = 50051
+const grpcUserApiDesc = "User-Api-v1"
 
 type server struct {
 	desc.UnimplementedUserV1Server
 }
 
 func (s *server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetResponse, error) {
+	log.Println(grpcUserApiDesc)
 	log.Printf("Method Get. Input params:\nId: %d\n************\n\n",
 		req.GetId())
 
@@ -36,6 +38,7 @@ func (s *server) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetRespon
 }
 
 func (s *server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
+	log.Println(grpcUserApiDesc)
 	log.Printf("Method Create. Input params:\nName: %s\nEmail: %s\nPassword: %s\nPasswordConfirm: %s\nRole: %s\n************\n\n",
 		req.GetName(),
 		req.GetEmail(),
@@ -51,6 +54,7 @@ func (s *server) Create(ctx context.Context, req *desc.CreateRequest) (*desc.Cre
 }
 
 func (s *server) Update(ctx context.Context, req *desc.UpdateRequest) (*emptypb.Empty, error) {
+	log.Println(grpcUserApiDesc)
 	log.Printf("Method Update. Input params:\nId: %d\nName: %s\nEmail: %s\nRole: %s\n************\n\n",
 		req.GetId(),
 		req.GetName(),
@@ -63,6 +67,7 @@ func (s *server) Update(ctx context.Context, req *desc.UpdateRequest) (*emptypb.
 }
 
 func (s *server) Delete(ctx context.Context, req *desc.DeleteRequest) (*emptypb.Empty, error) {
+	log.Println(grpcUserApiDesc)
 	log.Printf("Method Delete. Input params:\nId: %d\n************\n\n",
 		req.GetId())
 
