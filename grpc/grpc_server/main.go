@@ -42,34 +42,34 @@ func main() {
 	}
 }
 
-func (s *server) Get(_ context.Context, req *desc.GetRequest) (*desc.GetResponse, error) {
+func (s *server) GetUserInfo(_ context.Context, req *desc.GetUserInfoRequest) (*desc.GetUserInfoResponse, error) {
 	log.Printf("%s\nMethod Get.\nInput params:\n%+v\n************\n\n", grpcUserApiDesc, req)
 
-	return &desc.GetResponse{
+	return &desc.GetUserInfoResponse{
 		Id:        req.GetId(),
 		Name:      "Test Name",
-		Email:     "Test Email",
+		Email:     "test@email.com",
 		Role:      desc.UserRole_USER,
 		CreatedAt: timestamppb.New(time.Now()),
 		UpdatedAt: timestamppb.New(time.Now()),
 	}, nil
 }
 
-func (s *server) Create(_ context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
+func (s *server) CreateUser(_ context.Context, req *desc.CreateUserRequest) (*desc.CreateUserResponse, error) {
 	log.Printf("%s\nMethod Create.\nInput params:\n%+v\n************\n\n", grpcUserApiDesc, req)
 
-	return &desc.CreateResponse{
+	return &desc.CreateUserResponse{
 		Id: 1,
 	}, nil
 }
 
-func (s *server) Update(_ context.Context, req *desc.UpdateRequest) (*emptypb.Empty, error) {
+func (s *server) UpdateUser(_ context.Context, req *desc.UpdateUserRequest) (*emptypb.Empty, error) {
 	log.Printf("%s\nMethod Update.\nInput params:\n%+v\n************\n\n", grpcUserApiDesc, req)
 
 	return &emptypb.Empty{}, nil
 }
 
-func (s *server) Delete(_ context.Context, req *desc.DeleteRequest) (*emptypb.Empty, error) {
+func (s *server) DeleteUser(_ context.Context, req *desc.DeleteUserRequest) (*emptypb.Empty, error) {
 	log.Printf("%s\nMethod Delete.\nInput params:\n%+v\n************\n\n", grpcUserApiDesc, req)
 
 	return &emptypb.Empty{}, nil

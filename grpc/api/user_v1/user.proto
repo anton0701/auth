@@ -9,13 +9,13 @@ import "google/protobuf/wrappers.proto";
 option go_package = "github.com/anton0701/auth/grpc/pkg/user_v1;user_v1";
 
 service UserV1 {
-  rpc Create(CreateRequest) returns (CreateResponse);
-  rpc Get(GetRequest) returns (GetResponse);
-  rpc Update(UpdateRequest) returns (google.protobuf.Empty);
-  rpc Delete(DeleteRequest) returns (google.protobuf.Empty);
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc GetUserInfo(GetUserInfoRequest) returns (GetUserInfoResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (google.protobuf.Empty);
+  rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
 }
 
-message CreateRequest {
+message CreateUserRequest {
   string name = 1;
   string email = 2;
   string password = 3;
@@ -29,15 +29,15 @@ enum UserRole {
   ADMIN = 2;
 }
 
-message CreateResponse {
+message CreateUserResponse {
   int64 id = 1;
 }
 
-message GetRequest {
+message GetUserInfoRequest {
   int64 id = 1;
 }
 
-message GetResponse {
+message GetUserInfoResponse {
   int64 id = 1;
   string name = 2;
   string email = 3;
@@ -46,13 +46,13 @@ message GetResponse {
   google.protobuf.Timestamp updated_at = 6;
 }
 
-message UpdateRequest {
+message UpdateUserRequest {
   int64 id = 1;
   google.protobuf.StringValue name = 2;
   google.protobuf.StringValue email = 3;
   UserRole role = 4;
 }
 
-message DeleteRequest {
+message DeleteUserRequest {
   int64 id = 1;
 }
