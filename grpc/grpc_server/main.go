@@ -17,7 +17,7 @@ import (
 
 const (
 	grpcPort        = 50051
-	grpcUserApiDesc = "User-Api-v1"
+	grpcUserAPIDesc = "User-API-v1"
 )
 
 type server struct {
@@ -43,7 +43,7 @@ func main() {
 }
 
 func (s *server) GetUserInfo(_ context.Context, req *desc.GetUserInfoRequest) (*desc.GetUserInfoResponse, error) {
-	log.Printf("%s\nMethod Get.\nInput params:\n%+v\n************\n\n", grpcUserApiDesc, req)
+	log.Printf("%s\nMethod Get.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
 
 	return &desc.GetUserInfoResponse{
 		Id:        req.GetId(),
@@ -56,7 +56,7 @@ func (s *server) GetUserInfo(_ context.Context, req *desc.GetUserInfoRequest) (*
 }
 
 func (s *server) CreateUser(_ context.Context, req *desc.CreateUserRequest) (*desc.CreateUserResponse, error) {
-	log.Printf("%s\nMethod Create.\nInput params:\n%+v\n************\n\n", grpcUserApiDesc, req)
+	log.Printf("%s\nMethod Create.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
 
 	return &desc.CreateUserResponse{
 		Id: 1,
@@ -64,13 +64,13 @@ func (s *server) CreateUser(_ context.Context, req *desc.CreateUserRequest) (*de
 }
 
 func (s *server) UpdateUser(_ context.Context, req *desc.UpdateUserRequest) (*emptypb.Empty, error) {
-	log.Printf("%s\nMethod Update.\nInput params:\n%+v\n************\n\n", grpcUserApiDesc, req)
+	log.Printf("%s\nMethod Update.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
 
 	return &emptypb.Empty{}, nil
 }
 
 func (s *server) DeleteUser(_ context.Context, req *desc.DeleteUserRequest) (*emptypb.Empty, error) {
-	log.Printf("%s\nMethod Delete.\nInput params:\n%+v\n************\n\n", grpcUserApiDesc, req)
+	log.Printf("%s\nMethod Delete.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
 
 	return &emptypb.Empty{}, nil
 }
