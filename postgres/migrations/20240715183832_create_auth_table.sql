@@ -4,6 +4,8 @@ create table auth (
     name text not null,
     email text not null,
     role int,
+    password text not null,
+    password_confirm text not null,
     created_at timestamp not null default now(),
     updated_at timestamp
 );
