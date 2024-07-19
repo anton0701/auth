@@ -10,8 +10,12 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -27,6 +31,7 @@ const (
 type server struct {
 	desc.UnimplementedUserV1Server
 	dbPool *pgxpool.Pool
+	log    *zap.Logger
 }
 
 func main() {
@@ -42,9 +47,14 @@ func main() {
 		log.Fatalf("%s\nUnable to connect to db, error: %#v", grpcUserAPIDesc, err)
 	}
 
+	logger, err := initLogger()
+	if err != nil {
+		log.Fatalf("%s\nUnable to init logger, error: %#v", grpcUserAPIDesc, err)
+	}
+
 	s := grpc.NewServer()
 	reflection.Register(s)
-	desc.RegisterUserV1Server(s, &server{dbPool: pool})
+	desc.RegisterUserV1Server(s, &server{dbPool: pool, log: logger})
 
 	log.Printf("server listening at %v\n\n", lis.Addr())
 
@@ -53,8 +63,21 @@ func main() {
 	}
 }
 
+func initLogger() (*zap.Logger, error) {
+	config := zap.NewProductionConfig()
+	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	logger, err := config.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	logger = logger.With(zap.String("API", grpcUserAPIDesc))
+	return logger, nil
+}
+
 func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) (*desc.GetUserInfoResponse, error) {
-	log.Printf("%s\nMethod Get-User.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
+	s.log.Info("Method Get-User", zap.Any("Input params", req))
 
 	builderSelect := sq.
 		Select("id", "name", "email", "role", "created_at", "updated_at").
@@ -64,8 +87,12 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 
 	query, args, err := builderSelect.ToSql()
 	if err != nil {
-		log.Fatalf("%s\nMethod Get-User.\nUnable to create sql from builderInsert, error: %#v", grpcUserAPIDesc, err)
+		s.log.Error("Method Get-User. Unable to create SQL from builderInsert", zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "Unable to create SQL from builderInsert: %v", err)
 	}
+	s.log.Info("Method Get-User. Generated SQL Query",
+		zap.String("query", query),
+		zap.Any("args", args))
 
 	var (
 		id          int64
@@ -80,9 +107,11 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 		Scan(&id, &name, &email, &role, &createdAt, &updatedAt)
 
 	if err != nil {
-		log.Fatalf("%s\nMethod Get-User.\nFatal while query row, error: %#v", grpcUserAPIDesc, err)
+		s.log.Error("Method Get-User. Error while query row", zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "Error while query row %v", err)
 	}
 
+	// TODO: перепроверить
 	var updatedAtProto *timestamppb.Timestamp
 	if updatedAt.Valid {
 		updatedAtProto = timestamppb.New(updatedAt.Time)
