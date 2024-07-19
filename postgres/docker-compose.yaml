@@ -1,10 +1,10 @@
 version: '3'
 
 volumes:
-  postgres_volume:
+  auth_postgres_volume:
 
 services:
-  pg:
+  auth-pg:
     image: postgres:14-alpine3.17
     environment:
       - "POSTGRES_DB=${PG_DATABASE_NAME}"
@@ -13,4 +13,4 @@ services:
     ports:
       - "${PG_PORT}:5432"
     volumes:
-      - postgres_volume:/var/lib/postgresql/data
+      - auth_postgres_volume:/var/lib/postgresql/data
