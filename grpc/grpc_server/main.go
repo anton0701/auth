@@ -26,33 +26,35 @@ const (
 
 type server struct {
 	desc.UnimplementedUserV1Server
+	dbPool *pgxpool.Pool
 }
 
 func main() {
+	ctx := context.Background()
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalf("%s\nfailed to listen: %v", grpcUserAPIDesc, err)
+	}
+
+	pool, err := pgxpool.Connect(ctx, dbDSN)
+	if err != nil {
+		log.Fatalf("%s\nUnable to connect to db, error: %#v", grpcUserAPIDesc, err)
 	}
 
 	s := grpc.NewServer()
 	reflection.Register(s)
-	desc.RegisterUserV1Server(s, &server{})
+	desc.RegisterUserV1Server(s, &server{dbPool: pool})
 
 	log.Printf("server listening at %v\n\n", lis.Addr())
 
 	if err = s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Fatalf("%s\nfailed to serve: %v", grpcUserAPIDesc, err)
 	}
 }
 
 func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) (*desc.GetUserInfoResponse, error) {
 	log.Printf("%s\nMethod Get-User.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
-
-	pool, err := pgxpool.Connect(ctx, dbDSN)
-	if err != nil {
-		log.Fatalf("%s\nMethod Get-User.\nUnable to connect to db, error: %#v", grpcUserAPIDesc, err)
-	}
 
 	builderSelect := sq.
 		Select("id", "name", "email", "role", "created_at", "updated_at").
@@ -73,7 +75,7 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 		updatedAt   sql.NullTime
 	)
 
-	err = pool.
+	err = s.dbPool.
 		QueryRow(ctx, query, args...).
 		Scan(&id, &name, &email, &role, &createdAt, &updatedAt)
 
@@ -101,11 +103,6 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*desc.CreateUserResponse, error) {
 	log.Printf("%s\nMethod Create-User.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
 
-	pool, err := pgxpool.Connect(ctx, dbDSN)
-	if err != nil {
-		log.Fatalf("%s\nMethod Create-User.\nUnable to connect to db, error: %#v", grpcUserAPIDesc, err)
-	}
-
 	builderInsert := sq.Insert("auth").
 		PlaceholderFormat(sq.Dollar).
 		Columns("name", "email", "password", "password_confirm", "role").
@@ -120,10 +117,9 @@ func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*
 	log.Printf("Arguments: %v", args)
 
 	var userID int64
-	err = pool.QueryRow(ctx, query, args...).Scan(&userID)
-
-	log.Printf("USER_ROLE: %v", req.Role)
-	log.Printf("INT32(USER_ROLE): %v", int32(req.Role))
+	err = s.dbPool.
+		QueryRow(ctx, query, args...).
+		Scan(&userID)
 
 	if err != nil {
 		log.Fatalf("%s\nMethod Create-User.\nUnable to get userID from created user, error: %#v", grpcUserAPIDesc, err)
@@ -136,11 +132,6 @@ func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*
 
 func (s *server) UpdateUser(ctx context.Context, req *desc.UpdateUserRequest) (*emptypb.Empty, error) {
 	log.Printf("%s\nMethod Update.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
-
-	pool, err := pgxpool.Connect(ctx, dbDSN)
-	if err != nil {
-		log.Fatalf("%s\nMethod Update-User.\nUnable to connect to db, error: %#v", grpcUserAPIDesc, err)
-	}
 
 	builderUpdate := sq.
 		Update("auth").
@@ -157,7 +148,7 @@ func (s *server) UpdateUser(ctx context.Context, req *desc.UpdateUserRequest) (*
 		log.Printf("%s\nMethod Update-User.\nUnable to create sql from builderUpdate, error: %#v", grpcUserAPIDesc, err)
 	}
 
-	_, err = pool.Exec(ctx, query, args...)
+	_, err = s.dbPool.Exec(ctx, query, args...)
 	if err != nil {
 		//log.Fatalf("%s\nMethod Update-User.\nUnable to execute sql query, error: %#v", grpcUserAPIDesc, err)
 		log.Printf("%s\nMethod Update-User.\nUnable to execute sql query, error: %#v", grpcUserAPIDesc, err)
@@ -169,11 +160,6 @@ func (s *server) UpdateUser(ctx context.Context, req *desc.UpdateUserRequest) (*
 func (s *server) DeleteUser(ctx context.Context, req *desc.DeleteUserRequest) (*emptypb.Empty, error) {
 	log.Printf("%s\nMethod Delete.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
 
-	pool, err := pgxpool.Connect(ctx, dbDSN)
-	if err != nil {
-		log.Fatalf("%s\nMethod Delete-User.\nUnable to connect to db, error: %#v", grpcUserAPIDesc, err)
-	}
-
 	builderDelete := sq.Delete("auth").
 		PlaceholderFormat(sq.Dollar).
 		Where(sq.Eq{"id": req.Id})
@@ -183,7 +169,7 @@ func (s *server) DeleteUser(ctx context.Context, req *desc.DeleteUserRequest) (*
 		log.Printf("%s\nMethod Delete-User.\nUnable to create sql from builderDelete, error: %#v", grpcUserAPIDesc, err)
 	}
 
-	_, err = pool.Exec(ctx, query, args...)
+	_, err = s.dbPool.Exec(ctx, query, args...)
 	if err != nil {
 		log.Printf("%s\nMethod Delete-User.\nUnable to execute sql query, error: %#v", grpcUserAPIDesc, err)
 	}
