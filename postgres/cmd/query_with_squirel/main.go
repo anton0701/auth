@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"database/sql"
-	"github.com/brianvoe/gofakeit"
 	"log"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/brianvoe/gofakeit"
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	desc "github.com/anton0701/auth/grpc/pkg/user_v1"
@@ -28,8 +28,8 @@ func main() {
 
 	builderInsert := sq.Insert("auth").
 		PlaceholderFormat(sq.Dollar).
-		Columns("name", "email", "role").
-		Values(gofakeit.Name(), gofakeit.Email(), 1).
+		Columns("name", "email", "role", "password", "password_confirm").
+		Values(gofakeit.Name(), gofakeit.Email(), 1, "password", "password").
 		Suffix("RETURNING id")
 
 	query, args, err := builderInsert.ToSql()
