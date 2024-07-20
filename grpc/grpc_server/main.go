@@ -36,30 +36,31 @@ type server struct {
 
 func main() {
 	ctx := context.Background()
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
-
-	if err != nil {
-		log.Fatalf("%s\nfailed to listen: %v", grpcUserAPIDesc, err)
-	}
-
-	pool, err := pgxpool.Connect(ctx, dbDSN)
-	if err != nil {
-		log.Fatalf("%s\nUnable to connect to db, error: %#v", grpcUserAPIDesc, err)
-	}
 
 	logger, err := initLogger()
 	if err != nil {
 		log.Fatalf("%s\nUnable to init logger, error: %#v", grpcUserAPIDesc, err)
 	}
 
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
+
+	if err != nil {
+		logger.Panic("Failed to listen", zap.Error(err))
+	}
+
+	pool, err := pgxpool.Connect(ctx, dbDSN)
+	if err != nil {
+		logger.Panic("Unable to connect to db", zap.Error(err))
+	}
+
 	s := grpc.NewServer()
 	reflection.Register(s)
 	desc.RegisterUserV1Server(s, &server{dbPool: pool, log: logger})
 
-	log.Printf("server listening at %v\n\n", lis.Addr())
+	logger.Info("Server listening at", zap.Any("Address", lis.Addr()))
 
 	if err = s.Serve(lis); err != nil {
-		log.Fatalf("%s\nfailed to serve: %v", grpcUserAPIDesc, err)
+		logger.Panic("Failed to serve", zap.Error(err))
 	}
 }
 
@@ -87,8 +88,8 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 
 	query, args, err := builderSelect.ToSql()
 	if err != nil {
-		s.log.Error("Method Get-User. Unable to create SQL from builderInsert", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "Unable to create SQL from builderInsert: %v", err)
+		s.log.Error("Method Get-User. Unable to create SQL query from builder", zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "Unable to create SQL query from builder. Error info: %v", err)
 	}
 	s.log.Info("Method Get-User. Generated SQL Query",
 		zap.String("query", query),
@@ -108,7 +109,7 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 
 	if err != nil {
 		s.log.Error("Method Get-User. Error while query row", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "Error while query row %v", err)
+		return nil, status.Errorf(codes.Internal, "Error while query row. Error info: %v", err)
 	}
 
 	// TODO: перепроверить
@@ -130,7 +131,7 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 }
 
 func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*desc.CreateUserResponse, error) {
-	log.Printf("%s\nMethod Create-User.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
+	s.log.Info("Method Create-User", zap.Any("Input params", req))
 
 	builderInsert := sq.Insert("auth").
 		PlaceholderFormat(sq.Dollar).
@@ -140,10 +141,9 @@ func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*
 
 	query, args, err := builderInsert.ToSql()
 	if err != nil {
-		log.Fatalf("%s\nMethod Create-User.\nUnable to create sql from builderInsert, error: %#v", grpcUserAPIDesc, err)
+		s.log.Error("Method Create-User. Unable to create SQL query from builder", zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "Unable to create SQL query from builder, error: %#v", err)
 	}
-	log.Printf("Generated SQL Query: %s", query)
-	log.Printf("Arguments: %v", args)
 
 	var userID int64
 	err = s.dbPool.
@@ -151,7 +151,8 @@ func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*
 		Scan(&userID)
 
 	if err != nil {
-		log.Fatalf("%s\nMethod Create-User.\nUnable to get userID from created user, error: %#v", grpcUserAPIDesc, err)
+		s.log.Error("Method Create-User. Unable to get userID from created user", zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "Unable to get userID from created user, error: %#v", err)
 	}
 
 	return &desc.CreateUserResponse{
@@ -160,7 +161,7 @@ func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*
 }
 
 func (s *server) UpdateUser(ctx context.Context, req *desc.UpdateUserRequest) (*emptypb.Empty, error) {
-	log.Printf("%s\nMethod Update.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
+	s.log.Info("Method Update-User", zap.Any("Input params", req))
 
 	builderUpdate := sq.
 		Update("auth").
@@ -173,21 +174,21 @@ func (s *server) UpdateUser(ctx context.Context, req *desc.UpdateUserRequest) (*
 
 	query, args, err := builderUpdate.ToSql()
 	if err != nil {
-		//log.Fatalf("%s\nMethod Update-User.\nUnable to create sql from builderUpdate, error: %#v", grpcUserAPIDesc, err)
-		log.Printf("%s\nMethod Update-User.\nUnable to create sql from builderUpdate, error: %#v", grpcUserAPIDesc, err)
+		s.log.Error("Method Update-User. Unable to create SQL query from builder", zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "Unable to create SQL query from builder, error info: %#v", err)
 	}
 
 	_, err = s.dbPool.Exec(ctx, query, args...)
 	if err != nil {
-		//log.Fatalf("%s\nMethod Update-User.\nUnable to execute sql query, error: %#v", grpcUserAPIDesc, err)
-		log.Printf("%s\nMethod Update-User.\nUnable to execute sql query, error: %#v", grpcUserAPIDesc, err)
+		s.log.Error("Method Update-User. Unable to execute SQL query", zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "Unable to execute SQL query, error info: %#v", err)
 	}
 
 	return &emptypb.Empty{}, nil
 }
 
 func (s *server) DeleteUser(ctx context.Context, req *desc.DeleteUserRequest) (*emptypb.Empty, error) {
-	log.Printf("%s\nMethod Delete.\nInput params:\n%+v\n************\n\n", grpcUserAPIDesc, req)
+	s.log.Info("Method Delete-User", zap.Any("Input params", req))
 
 	builderDelete := sq.Delete("auth").
 		PlaceholderFormat(sq.Dollar).
@@ -195,12 +196,14 @@ func (s *server) DeleteUser(ctx context.Context, req *desc.DeleteUserRequest) (*
 
 	query, args, err := builderDelete.ToSql()
 	if err != nil {
-		log.Printf("%s\nMethod Delete-User.\nUnable to create sql from builderDelete, error: %#v", grpcUserAPIDesc, err)
+		s.log.Error("Method Delete-User. Unable to create SQL query from builder", zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "Unable to create SQL query from builder, error info: %#v", err)
 	}
 
 	_, err = s.dbPool.Exec(ctx, query, args...)
 	if err != nil {
-		log.Printf("%s\nMethod Delete-User.\nUnable to execute sql query, error: %#v", grpcUserAPIDesc, err)
+		s.log.Error("Method Delete-User. Unable to execute SQL query", zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "Unable to execute SQL query, error info: %#v", err)
 	}
 
 	return &emptypb.Empty{}, nil
