@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -80,6 +81,13 @@ func initLogger() (*zap.Logger, error) {
 func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) (*desc.GetUserInfoResponse, error) {
 	s.log.Info("Method Get-User", zap.Any("Input params", req))
 
+	// Проверка необходимых полей, в запросе должен быть ID (User_ID)
+	if req.Id == 0 {
+		err := status.Error(codes.InvalidArgument, "User-id must be provided")
+		s.log.Error("Method Get-User", zap.Error(err))
+		return nil, err
+	}
+
 	builderSelect := sq.
 		Select("id", "name", "email", "role", "created_at", "updated_at").
 		From("auth").
@@ -91,9 +99,6 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 		s.log.Error("Method Get-User. Unable to create SQL query from builder", zap.Error(err))
 		return nil, status.Errorf(codes.Internal, "Unable to create SQL query from builder. Error info: %v", err)
 	}
-	s.log.Info("Method Get-User. Generated SQL Query",
-		zap.String("query", query),
-		zap.Any("args", args))
 
 	var (
 		id          int64
@@ -112,7 +117,7 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 		return nil, status.Errorf(codes.Internal, "Error while query row. Error info: %v", err)
 	}
 
-	// TODO: перепроверить
+	// TODO: правильно?
 	var updatedAtProto *timestamppb.Timestamp
 	if updatedAt.Valid {
 		updatedAtProto = timestamppb.New(updatedAt.Time)
@@ -132,6 +137,36 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 
 func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*desc.CreateUserResponse, error) {
 	s.log.Info("Method Create-User", zap.Any("Input params", req))
+
+	// TODO: текст ошибки вынести в константу?
+
+	// Проверка наличия и корректности полей запроса
+	trimmedNameFromRequest := strings.TrimSpace(req.Name)
+	if len(trimmedNameFromRequest) == 0 {
+		err := status.Error(codes.InvalidArgument, "User name must not be empty")
+		s.log.Error("Method Create-User. Invalid input", zap.Error(err))
+		return nil, err
+	}
+
+	trimmedEmailFromRequest := strings.TrimSpace(req.Email)
+	if len(trimmedEmailFromRequest) == 0 {
+		err := status.Error(codes.InvalidArgument, "Email must not be empty")
+		s.log.Error("Method Create-User. Invalid input", zap.Error(err))
+		return nil, err
+	}
+
+	trimmedPasswordFromRequest := strings.TrimSpace(req.Password)
+	if (req.Password != req.PasswordConfirm) || len(trimmedPasswordFromRequest) == 0 {
+		err := status.Error(codes.InvalidArgument, "Password must not be empty. Password must be equal to Password_confirm")
+		s.log.Error("Method Create-User. Invalid input", zap.Error(err))
+		return nil, err
+	}
+
+	if req.GetRole() == desc.UserRole_UNKNOWN {
+		err := status.Error(codes.InvalidArgument, "Invalid role")
+		s.log.Error("Method Create-User. Invalid input", zap.Error(err))
+		return nil, err
+	}
 
 	builderInsert := sq.Insert("auth").
 		PlaceholderFormat(sq.Dollar).
@@ -163,14 +198,33 @@ func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*
 func (s *server) UpdateUser(ctx context.Context, req *desc.UpdateUserRequest) (*emptypb.Empty, error) {
 	s.log.Info("Method Update-User", zap.Any("Input params", req))
 
+	// Проверка наличия и корректности полей запроса
+	if req.GetRole() == desc.UserRole_UNKNOWN {
+		err := status.Error(codes.InvalidArgument, "Invalid role")
+		s.log.Error("Method Update-User. Invalid input", zap.Error(err))
+		return nil, err
+	}
+
 	builderUpdate := sq.
 		Update("auth").
 		PlaceholderFormat(sq.Dollar).
-		Set("name", req.Name).
-		Set("email", req.Email).
 		Set("role", int32(req.GetRole())).
 		Set("updated_at", time.Now()).
 		Where(sq.Eq{"id": req.Id})
+
+	if req.Name != nil {
+		trimmedName := strings.TrimSpace(req.Name.GetValue())
+		if len(trimmedName) > 0 {
+			builderUpdate.Set("name", trimmedName)
+		}
+	}
+
+	if req.Email != nil {
+		trimmedEmail := strings.TrimSpace(req.Email.GetValue())
+		if len(trimmedEmail) > 0 {
+			builderUpdate.Set("name", trimmedEmail)
+		}
+	}
 
 	query, args, err := builderUpdate.ToSql()
 	if err != nil {
@@ -189,6 +243,12 @@ func (s *server) UpdateUser(ctx context.Context, req *desc.UpdateUserRequest) (*
 
 func (s *server) DeleteUser(ctx context.Context, req *desc.DeleteUserRequest) (*emptypb.Empty, error) {
 	s.log.Info("Method Delete-User", zap.Any("Input params", req))
+
+	if req.Id == 0 {
+		err := status.Error(codes.InvalidArgument, "User-id must be provided")
+		s.log.Error("Method Delete-User", zap.Error(err))
+		return nil, err
+	}
 
 	builderDelete := sq.Delete("auth").
 		PlaceholderFormat(sq.Dollar).
