@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"flag"
 	"log"
 	"net"
 	"strings"
@@ -20,19 +20,25 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	config "github.com/anton0701/auth/config"
+	env "github.com/anton0701/auth/config/env"
 	desc "github.com/anton0701/auth/grpc/pkg/user_v1"
 )
 
 const (
-	grpcPort        = 50051
 	grpcUserAPIDesc = "User-API-v1"
-	dbDSN           = "host=localhost port=54321 dbname=auth user=auth-user password=auth-password"
 )
 
 type server struct {
 	desc.UnimplementedUserV1Server
 	dbPool *pgxpool.Pool
 	log    *zap.Logger
+}
+
+var configPath string
+
+func init() {
+	flag.StringVar(&configPath, "config-path", ".env", "path to config")
 }
 
 func main() {
@@ -43,13 +49,26 @@ func main() {
 		log.Fatalf("%s\nUnable to init logger, error: %#v", grpcUserAPIDesc, err)
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
+	err = config.Load(configPath)
+	if err != nil {
+		logger.Fatal("Unable to load config", zap.Error(err))
+	}
+
+	grpcConfig, err := env.NewGRPCConfig()
+	if err != nil {
+		logger.Fatal("Unable to get grpc config", zap.Error(err))
+	}
+	lis, err := net.Listen("tcp", grpcConfig.Address())
 
 	if err != nil {
 		logger.Panic("Failed to listen", zap.Error(err))
 	}
 
-	pool, err := pgxpool.Connect(ctx, dbDSN)
+	pgConfig, err := env.NewPGConfig()
+	if err != nil {
+		logger.Fatal("Unable to get postgres config", zap.Error(err))
+	}
+	pool, err := pgxpool.Connect(ctx, pgConfig.DSN())
 	if err != nil {
 		logger.Panic("Unable to connect to db", zap.Error(err))
 	}
@@ -66,10 +85,10 @@ func main() {
 }
 
 func initLogger() (*zap.Logger, error) {
-	config := zap.NewProductionConfig()
-	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	zapConfig := zap.NewProductionConfig()
+	zapConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
-	logger, err := config.Build()
+	logger, err := zapConfig.Build()
 	if err != nil {
 		return nil, err
 	}

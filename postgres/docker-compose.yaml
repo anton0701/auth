@@ -1,16 +1,28 @@
 version: '3'
 
 volumes:
-  auth_postgres_volume:
+  auth_postgres_volume_local:
+  auth_postgres_volume_prod:
 
 services:
-  auth-pg:
+  auth-pg-local:
     image: postgres:14-alpine3.17
     environment:
       - "POSTGRES_DB=${PG_DATABASE_NAME}"
       - "POSTGRES_USER=${PG_USER}"
       - "POSTGRES_PASSWORD=${PG_PASSWORD}"
     ports:
-      - "${PG_PORT}:5432"
+      - "54321:5432"
     volumes:
-      - auth_postgres_volume:/var/lib/postgresql/data
+      - auth_postgres_volume_local:/var/lib/postgresql/data
+
+  auth-pg-prod:
+    image: postgres:14-alpine3.17
+    environment:
+      - "POSTGRES_DB=${PG_DATABASE_NAME}"
+      - "POSTGRES_USER=${PG_USER}"
+      - "POSTGRES_PASSWORD=${PG_PASSWORD}"
+    ports:
+      - "54322:5432"
+    volumes:
+      - auth_postgres_volume_prod:/var/lib/postgresql/data
