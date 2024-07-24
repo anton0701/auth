@@ -38,10 +38,11 @@ type server struct {
 var configPath string
 
 func init() {
-	flag.StringVar(&configPath, "config-path", ".env", "path to config")
+	flag.StringVar(&configPath, "config-path", ".env", "path to config file")
 }
 
 func main() {
+	flag.Parse()
 	ctx := context.Background()
 
 	logger, err := initLogger()
@@ -58,16 +59,17 @@ func main() {
 	if err != nil {
 		logger.Fatal("Unable to get grpc config", zap.Error(err))
 	}
-	lis, err := net.Listen("tcp", grpcConfig.Address())
-
-	if err != nil {
-		logger.Panic("Failed to listen", zap.Error(err))
-	}
 
 	pgConfig, err := env.NewPGConfig()
 	if err != nil {
 		logger.Fatal("Unable to get postgres config", zap.Error(err))
 	}
+
+	lis, err := net.Listen("tcp", grpcConfig.Address())
+	if err != nil {
+		logger.Panic("Failed to listen", zap.Error(err))
+	}
+
 	pool, err := pgxpool.Connect(ctx, pgConfig.DSN())
 	if err != nil {
 		logger.Panic("Unable to connect to db", zap.Error(err))
