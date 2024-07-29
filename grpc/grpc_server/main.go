@@ -99,6 +99,17 @@ func initLogger() (*zap.Logger, error) {
 	return logger, nil
 }
 
+// GetUserInfo возвращает данные о пользователе на основе запроса.
+//
+// Запрос включает в себя только ID пользователя.
+//
+// Параметры:
+//   - ctx: контекст для выполнения операции, позволяет отменять или ограничивать по времени выполнение метода.
+//   - req: запрос с данными о пользователе.
+//
+// Возвращает:
+//   - *GetUserInfoResponse - структура с данными о пользователе.
+//   - error - ошибка, если что-то пошло не так.
 func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) (*desc.GetUserInfoResponse, error) {
 	s.log.Info("Method Get-User", zap.Any("Input params", req))
 
@@ -132,7 +143,6 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 	err = s.dbPool.
 		QueryRow(ctx, query, args...).
 		Scan(&id, &name, &email, &role, &createdAt, &updatedAt)
-
 	if err != nil {
 		s.log.Error("Method Get-User. Error while query row", zap.Error(err))
 		return nil, status.Errorf(codes.Internal, "Error while query row. Error info: %v", err)
@@ -156,6 +166,17 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 	}, nil
 }
 
+// CreateUser создает нового пользователя.
+//
+// Запрос содержит данные об имени, email, роли юзера, пароле, повторе пароля (для валидации корректности ввода пароля).
+//
+// Параметры:
+//   - ctx: контекст для выполнения операции.
+//   - req: запрос на создание пользователя с данными пользователя.
+//
+// Возвращает:
+//   - *CreateUserResponse: структура с ID созданного пользователя.
+//   - error: ошибка, если что-то пошло не так.
 func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*desc.CreateUserResponse, error) {
 	s.log.Info("Method Create-User", zap.Any("Input params", req))
 
@@ -216,6 +237,15 @@ func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*
 	}, nil
 }
 
+// UpdateUser обновляет данные существующего пользователя.
+//
+// Параметры:
+//   - ctx: контекст для выполнения операции.
+//   - req: запрос с данными пользователя для обновления.
+//
+// Возвращает:
+//   - *emptypb.Empty - пустая структура, если метод выполнился корректно.
+//   - error - ошибка, если что-то пошло не так.
 func (s *server) UpdateUser(ctx context.Context, req *desc.UpdateUserRequest) (*emptypb.Empty, error) {
 	s.log.Info("Method Update-User", zap.Any("Input params", req))
 
@@ -262,6 +292,15 @@ func (s *server) UpdateUser(ctx context.Context, req *desc.UpdateUserRequest) (*
 	return &emptypb.Empty{}, nil
 }
 
+// DeleteUser удаляет данные о существующем пользователе.
+//
+// Параметры:
+//   - ctx: контекст выполнения операции.
+//   - req: запрос с данными об удаляемом пользователе (содержит только ID пользователя).
+//
+// Возвращает:
+//   - *emptypb.Empty - пустая структура, если метод выполнился корректно.
+//   - error - если что-то пошло не так.
 func (s *server) DeleteUser(ctx context.Context, req *desc.DeleteUserRequest) (*emptypb.Empty, error) {
 	s.log.Info("Method Delete-User", zap.Any("Input params", req))
 
