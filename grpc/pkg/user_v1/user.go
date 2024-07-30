@@ -5,6 +5,15 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/anton0701/auth/grpc/pkg"
+)
+
+var (
+	_ pkg.Validator = (*GetUserInfoRequest)(nil)
+	_ pkg.Validator = (*CreateUserRequest)(nil)
+	_ pkg.Validator = (*UpdateUserRequest)(nil)
+	_ pkg.Validator = (*DeleteUserRequest)(nil)
 )
 
 // Validate
