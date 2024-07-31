@@ -2,27 +2,22 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"flag"
 	"log"
 	"net"
-	"strings"
-	"time"
 
-	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	config "github.com/anton0701/auth/config"
 	env "github.com/anton0701/auth/config/env"
 	desc "github.com/anton0701/auth/grpc/pkg/user_v1"
+	"github.com/anton0701/auth/internal/repository"
+	"github.com/anton0701/auth/internal/repository/auth"
 )
 
 const (
@@ -31,8 +26,9 @@ const (
 
 type server struct {
 	desc.UnimplementedUserV1Server
-	dbPool *pgxpool.Pool
-	log    *zap.Logger
+	dbPool         *pgxpool.Pool
+	log            *zap.Logger
+	authRepository repository.AuthRepository
 }
 
 var configPath string
@@ -75,9 +71,11 @@ func main() {
 		logger.Panic("Unable to connect to db", zap.Error(err))
 	}
 
+	authRepo := auth.NewRepository(pool)
+
 	s := grpc.NewServer()
 	reflection.Register(s)
-	desc.RegisterUserV1Server(s, &server{dbPool: pool, log: logger})
+	desc.RegisterUserV1Server(s, &server{dbPool: pool, log: logger, authRepository: authRepo})
 
 	logger.Info("Server listening at", zap.Any("Address", lis.Addr()))
 
@@ -119,47 +117,9 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 		return nil, err
 	}
 
-	builderSelect := sq.
-		Select("id", "name", "email", "role", "created_at", "updated_at").
-		From("auth").
-		PlaceholderFormat(sq.Dollar).
-		Where(sq.Eq{"id": req.Id})
+	resp, err := s.authRepository.GetUser(ctx, req)
 
-	query, args, err := builderSelect.ToSql()
-	if err != nil {
-		s.log.Error("Method Get-User. Unable to create SQL query from builder", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "Unable to create SQL query from builder. Error info: %v", err)
-	}
-
-	var (
-		id          int64
-		name, email string
-		role        desc.UserRole
-		createdAt   time.Time
-		updatedAt   sql.NullTime
-	)
-
-	err = s.dbPool.
-		QueryRow(ctx, query, args...).
-		Scan(&id, &name, &email, &role, &createdAt, &updatedAt)
-	if err != nil {
-		s.log.Error("Method Get-User. Error while query row", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "Error while query row. Error info: %v", err)
-	}
-
-	var updatedAtProto *timestamppb.Timestamp
-	if updatedAt.Valid {
-		updatedAtProto = timestamppb.New(updatedAt.Time)
-	}
-
-	return &desc.GetUserInfoResponse{
-		Id:        id,
-		Name:      name,
-		Email:     email,
-		Role:      role,
-		CreatedAt: timestamppb.New(createdAt),
-		UpdatedAt: updatedAtProto,
-	}, nil
+	return resp, err
 }
 
 // CreateUser создает нового пользователя.
@@ -182,31 +142,9 @@ func (s *server) CreateUser(ctx context.Context, req *desc.CreateUserRequest) (*
 		return nil, err
 	}
 
-	builderInsert := sq.Insert("auth").
-		PlaceholderFormat(sq.Dollar).
-		Columns("name", "email", "password", "password_confirm", "role").
-		Values(req.Name, req.Email, req.Password, req.PasswordConfirm, int32(req.Role)).
-		Suffix("RETURNING id")
+	resp, err := s.authRepository.CreateUser(ctx, req)
 
-	query, args, err := builderInsert.ToSql()
-	if err != nil {
-		s.log.Error("Method Create-User. Unable to create SQL query from builder", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "Unable to create SQL query from builder, error: %#v", err)
-	}
-
-	var userID int64
-	err = s.dbPool.
-		QueryRow(ctx, query, args...).
-		Scan(&userID)
-
-	if err != nil {
-		s.log.Error("Method Create-User. Unable to get userID from created user", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "Unable to get userID from created user, error: %#v", err)
-	}
-
-	return &desc.CreateUserResponse{
-		Id: userID,
-	}, nil
+	return resp, err
 }
 
 // UpdateUser обновляет данные существующего пользователя.
@@ -227,37 +165,9 @@ func (s *server) UpdateUser(ctx context.Context, req *desc.UpdateUserRequest) (*
 		return nil, err
 	}
 
-	builderUpdate := sq.
-		Update("auth").
-		PlaceholderFormat(sq.Dollar).
-		Set("role", int32(req.GetRole())).
-		Set("updated_at", time.Now()).
-		Where(sq.Eq{"id": req.Id})
-
-	if req.Name != nil {
-		trimmedName := strings.TrimSpace(req.Name.GetValue())
-		if len(trimmedName) > 0 {
-			builderUpdate.Set("name", trimmedName)
-		}
-	}
-
-	if req.Email != nil {
-		trimmedEmail := strings.TrimSpace(req.Email.GetValue())
-		if len(trimmedEmail) > 0 {
-			builderUpdate.Set("name", trimmedEmail)
-		}
-	}
-
-	query, args, err := builderUpdate.ToSql()
+	err := s.authRepository.UpdateUser(ctx, req)
 	if err != nil {
-		s.log.Error("Method Update-User. Unable to create SQL query from builder", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "Unable to create SQL query from builder, error info: %#v", err)
-	}
-
-	_, err = s.dbPool.Exec(ctx, query, args...)
-	if err != nil {
-		s.log.Error("Method Update-User. Unable to execute SQL query", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "Unable to execute SQL query, error info: %#v", err)
+		return nil, err
 	}
 
 	return &emptypb.Empty{}, nil
@@ -281,20 +191,9 @@ func (s *server) DeleteUser(ctx context.Context, req *desc.DeleteUserRequest) (*
 		return nil, err
 	}
 
-	builderDelete := sq.Delete("auth").
-		PlaceholderFormat(sq.Dollar).
-		Where(sq.Eq{"id": req.Id})
-
-	query, args, err := builderDelete.ToSql()
+	err := s.authRepository.DeleteUser(ctx, req)
 	if err != nil {
-		s.log.Error("Method Delete-User. Unable to create SQL query from builder", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "Unable to create SQL query from builder, error info: %#v", err)
-	}
-
-	_, err = s.dbPool.Exec(ctx, query, args...)
-	if err != nil {
-		s.log.Error("Method Delete-User. Unable to execute SQL query", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "Unable to execute SQL query, error info: %#v", err)
+		return nil, err
 	}
 
 	return &emptypb.Empty{}, nil
