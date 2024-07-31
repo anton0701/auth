@@ -150,8 +150,6 @@ func (s *server) GetUserInfo(ctx context.Context, req *desc.GetUserInfoRequest) 
 	var updatedAtProto *timestamppb.Timestamp
 	if updatedAt.Valid {
 		updatedAtProto = timestamppb.New(updatedAt.Time)
-	} else {
-		updatedAtProto = nil
 	}
 
 	return &desc.GetUserInfoResponse{
